@@ -1,0 +1,2764 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>任务分发与回销追踪平台 - 中国东方航空</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <!-- Google Fonts - 独特字体组合 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- 统一的 Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // 东航主题色 - 更精致的配色
+                        'ce-red': '#E50000',
+                        'ce-red-dark': '#C50000',
+                        'ce-red-light': '#FF3333',
+                        'ce-blue': '#00227F',
+                        'ce-blue-dark': '#001A66',
+                        'ce-blue-light': '#4DA1FF',
+                        'ce-navy': '#0A1628',
+                        'ce-slate': '#1E293B',
+                        'ce-gray-100': '#F8FAFC',
+                        'ce-gray-200': '#E2E8F0',
+                        'ce-gray-300': '#94A3B8',
+                        'ce-gray-400': '#475569',
+                        'ce-accent': '#06B6D4',
+                        'ce-gold': '#F59E0B',
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'Noto Sans SC', 'system-ui', 'sans-serif'],
+                        display: ['Outfit', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'card': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        'card-hover': '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                        'glow': '0 0 40px rgba(0, 34, 127, 0.15)',
+                        'glow-red': '0 0 30px rgba(229, 0, 0, 0.2)',
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out',
+                        'slide-up': 'slideUp 0.5s ease-out',
+                        'slide-in-left': 'slideInLeft 0.4s ease-out',
+                        'pulse-slow': 'pulse 3s infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        slideInLeft: {
+                            '0%': { opacity: '0', transform: 'translateX(-20px)' },
+                            '100%': { opacity: '1', transform: 'translateX(0)' },
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .transition-all-300 {
+                transition: all 0.3s ease;
+            }
+            .card-hover {
+                @apply transition-all duration-300 hover:shadow-card-hover hover:-translate-y-1;
+            }
+            .btn-primary {
+                @apply bg-ce-red hover:bg-ce-red-dark text-white font-medium py-2 px-4 rounded-lg transition-all duration-300 hover:shadow-glow-red;
+            }
+            .btn-secondary {
+                @apply bg-ce-blue hover:bg-ce-blue-dark text-white font-medium py-2 px-4 rounded-lg transition-all duration-300 hover:shadow-glow;
+            }
+            .btn-outline {
+                @apply border-2 border-ce-blue text-ce-blue hover:bg-ce-blue hover:text-white font-medium py-2 px-4 rounded-lg transition-all duration-300;
+            }
+            .btn-sm {
+                @apply py-1 px-3 text-sm;
+            }
+            .status-badge {
+                @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold;
+            }
+            .nav-link {
+                @apply flex items-center px-4 py-3 text-gray-600 transition-all duration-300 hover:bg-ce-blue hover:text-white rounded-xl relative overflow-hidden;
+            }
+            .nav-link::before {
+                content: '';
+                @apply absolute left-0 top-0 h-full w-1 bg-ce-red transform -translate-x-full transition-transform duration-300;
+            }
+            .nav-link:hover::before,
+            .nav-link.active::before {
+                @apply translate-x-0;
+            }
+            .nav-link.active {
+                @apply bg-ce-blue text-white shadow-glow;
+            }
+            .tab-button {
+                @apply px-4 py-2 font-medium text-gray-600 border-b-2 border-transparent hover:text-ce-blue transition-all duration-300;
+            }
+            .tab-button.active {
+                @apply text-ce-blue border-ce-blue;
+            }
+            .page-content.hidden {
+                display: none !important;
+            }
+            .step-content.hidden {
+                display: none !important;
+            }
+            .tab-content.hidden {
+                display: none !important;
+            }
+            /* 统计卡片悬浮效果 */
+            .stat-card {
+                @apply bg-white rounded-2xl shadow-card p-5 transition-all duration-500 relative overflow-hidden;
+            }
+            .stat-card::before {
+                content: '';
+                @apply absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-ce-blue to-ce-accent transform scale-x-0 transition-transform duration-500;
+            }
+            .stat-card:hover::before {
+                @apply scale-x-100;
+            }
+            .stat-card:hover {
+                @apply shadow-card-hover -translate-y-1;
+            }
+            /* 任务卡片样式 */
+            .task-item {
+                @apply border-l-4 pl-4 py-2 transition-all duration-300 hover:bg-gray-50 rounded-r-lg;
+            }
+            .task-item:hover {
+                @apply translate-x-1;
+            }
+            /* 移动端响应式样式 */
+            @media (max-width: 768px) {
+                .mobile-menu-btn {
+                    display: block !important;
+                }
+                .sidebar-mobile {
+                    transform: translateX(-100%);
+                    width: 80%;
+                    max-width: 280px;
+                }
+                .sidebar-mobile.active {
+                    transform: translateX(0);
+                }
+                .sidebar-overlay {
+                    display: block;
+                    opacity: 1;
+                }
+                .page-content {
+                    padding: 1rem !important;
+                    width: 100% !important;
+                }
+                .card-hover {
+                    transform: none;
+                }
+                .stats-grid {
+                    grid-template-columns: 1fr !important;
+                }
+                .task-table {
+                    display: block;
+                    overflow-x: auto;
+                }
+                .header-title {
+                    display: none;
+                }
+                .main-content {
+                    width: 100% !important;
+                    padding: 0.5rem !important;
+                }
+            }
+            /* 侧边栏遮罩层 */
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(10, 22, 40, 0.6);
+                backdrop-filter: blur(4px);
+                z-index: 25;
+                opacity: 0;
+                transition: opacity 0.3s;
+            }
+            .sidebar-overlay.active {
+                display: block;
+                opacity: 1;
+            }
+            /* 用户预览入口按钮样式 */
+            .preview-entry-btn {
+                @apply fixed bottom-6 right-6 z-50 bg-ce-blue text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg hover:bg-ce-blue-dark transition-all duration-300;
+            }
+            .preview-entry-btn:hover {
+                transform: scale(1.1);
+                @apply shadow-glow;
+            }
+            /* 企业集成入口样式 */
+            .integration-bar {
+                @apply bg-gradient-to-r from-ce-blue via-ce-navy to-ce-blue;
+            }
+            .integration-item {
+                @apply flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-300 hover:bg-white/20 cursor-pointer;
+            }
+            /* 输入框焦点样式 */
+            .input-focus {
+                @apply w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-ce-blue/30 focus:border-ce-blue transition-all duration-300;
+            }
+            .input-focus:focus {
+                @apply shadow-glow;
+            }
+            /* 渐变文字 */
+            .gradient-text {
+                @apply bg-gradient-to-r from-ce-blue to-ce-accent bg-clip-text text-transparent;
+            }
+            /* 玻璃态效果 */
+            .glass {
+                @apply bg-white/80 backdrop-blur-lg;
+            }
+        }
+    </style>
+    <style>
+        .hidden { display: none !important; }
+        
+        /* 页面加载动画 */
+        @keyframes pageEnter {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .page-content {
+            animation: pageEnter 0.4s ease-out;
+        }
+        
+        /* 统计数字动画 */
+        @keyframes countUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .stat-number {
+            animation: countUp 0.6s ease-out forwards;
+        }
+        
+        /* 背景装饰 */
+        body {
+            background: linear-gradient(135deg, #F8FAFC 0%, #EEF2FF 50%, #F8FAFC 100%);
+            min-height: 100vh;
+        }
+        
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #F1F5F9;
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94A3B8;
+        }
+        
+        /* 侧边栏装饰 */
+        .sidebar-decor {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 200px;
+            background: linear-gradient(to top, rgba(0, 34, 127, 0.03), transparent);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="font-sans antialiased">
+    <!-- 顶部导航栏 -->
+    <header class="bg-white/95 backdrop-blur-lg shadow-sm sticky top-0 z-40 border-b border-gray-100">
+        <div class="container mx-auto px-4 md:px-6 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <button id="mobile-menu-btn" class="mobile-menu-btn hidden text-gray-600 hover:text-ce-blue transition-colors">
+                    <i class="fa fa-bars text-xl"></i>
+                </button>
+                <div class="flex items-center space-x-3">
+                    <img src="logo.png" alt="中国东方航空" class="h-10">
+                    <div class="hidden md:block h-8 w-px bg-gray-200"></div>
+                    <h1 class="text-lg font-bold text-ce-blue hidden md:block header-title tracking-tight">任务分发与回销追踪平台</h1>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <!-- 移动端快捷操作 -->
+                <div class="flex items-center space-x-2 md:hidden">
+                    <button onclick="switchToUserView()" class="text-ce-blue hover:text-ce-blue-dark transition-colors" title="用户预览">
+                        <i class="fa fa-eye text-xl"></i>
+                    </button>
+                </div>
+                <div class="relative">
+                    <button class="flex items-center text-gray-600 hover:text-ce-red transition-all duration-300 group">
+                        <div class="relative">
+                            <i class="fa fa-bell-o text-xl group-hover:animate-pulse"></i>
+                            <span class="absolute -top-1 -right-1 bg-ce-red text-white text-xs rounded-full h-4 w-4 flex items-center justify-center font-medium">3</span>
+                        </div>
+                    </button>
+                </div>
+                <div class="flex items-center space-x-3 pl-4 border-l border-gray-200">
+                    <div class="w-9 h-9 rounded-full bg-gradient-to-br from-ce-blue to-ce-blue-light text-white flex items-center justify-center shadow-sm">
+                        <span class="font-semibold text-sm">张</span>
+                    </div>
+                    <div class="hidden md:block">
+                        <p class="text-sm font-semibold text-gray-800">张三</p>
+                        <p class="text-xs text-gray-500">产品技术部</p>
+                    </div>
+                    <i class="fa fa-angle-down text-gray-400 hidden md:block"></i>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex h-[calc(100vh-60px)] md:h-[calc(100vh-64px)]">
+        <!-- 侧边栏遮罩层 -->
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
+        <!-- 侧边导航栏 -->
+        <aside class="w-64 bg-white shadow-sm flex flex-col sidebar-mobile fixed md:relative h-full z-30 transition-all duration-300 border-r border-gray-100" id="sidebar">
+            <nav class="flex-1 p-3 md:p-4 space-y-1.5">
+                <a href="#dashboard" class="nav-link active" data-page="dashboard">
+                    <i class="fa fa-tachometer text-lg w-6"></i>
+                    <span class="ml-3 font-medium">工作台</span>
+                </a>
+                <a href="#task-create" class="nav-link" data-page="task-create">
+                    <i class="fa fa-plus-circle text-lg w-6"></i>
+                    <span class="ml-3 font-medium">创建任务</span>
+                </a>
+                <a href="#task-submit" class="nav-link" data-page="task-submit">
+                    <i class="fa fa-upload text-lg w-6"></i>
+                    <span class="ml-3 font-medium">文件上传</span>
+                </a>
+                <a href="#statistics" class="nav-link" data-page="statistics">
+                    <i class="fa fa-bar-chart text-lg w-6"></i>
+                    <span class="ml-3 font-medium">数据统计</span>
+                </a>
+                <a href="#settings" class="nav-link" data-page="settings">
+                    <i class="fa fa-cog text-lg w-6"></i>
+                    <span class="ml-3 font-medium">系统设置</span>
+                </a>
+            </nav>
+            <div class="p-4 border-t border-gray-100 hidden md:block relative">
+                <div class="flex items-center space-x-3 p-3 rounded-xl bg-gradient-to-r from-ce-blue/5 to-ce-accent/5 hover:from-ce-blue/10 hover:to-ce-accent/10 transition-all duration-300 cursor-pointer">
+                    <div class="w-10 h-10 rounded-full bg-ce-blue/10 flex items-center justify-center">
+                        <i class="fa fa-question-circle text-ce-blue text-lg"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-semibold text-gray-800">需要帮助?</p>
+                        <p class="text-xs text-gray-500">联系管理员</p>
+                    </div>
+                </div>
+                <div class="sidebar-decor"></div>
+            </div>
+        </aside>
+
+        <!-- 主内容区域 -->
+        <main class="flex-1 overflow-y-auto bg-gray-50 p-4 main-content">
+            <!-- 工作台页面 -->
+            <div id="dashboard-page" class="page-content">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800 tracking-tight">工作台</h2>
+                    <p class="text-gray-500 mt-1">欢迎回来，张三！以下是您的工作概览。</p>
+                </div>
+
+                <!-- 统计卡片 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+                    <div class="stat-card group">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-500 mb-1">待处理任务</p>
+                                <p class="text-3xl font-bold text-gray-800 stat-number">8</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                <i class="fa fa-clock-o text-ce-red text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-center pt-3 border-t border-gray-100">
+                            <span class="text-red-500 text-sm font-medium flex items-center">
+                                <i class="fa fa-exclamation-circle mr-1"></i>3 个即将到期
+                            </span>
+                            <a href="#task-submit" class="ml-auto text-ce-blue text-sm font-medium hover:underline flex items-center group/link">
+                                查看全部 <i class="fa fa-angle-right ml-1 group-hover/link:translate-x-1 transition-transform"></i>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="stat-card group">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-500 mb-1">已完成任务</p>
+                                <p class="text-3xl font-bold text-gray-800 stat-number">24</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                <i class="fa fa-check text-green-600 text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-center pt-3 border-t border-gray-100">
+                            <span class="text-green-500 text-sm font-medium flex items-center">
+                                <i class="fa fa-arrow-up mr-1"></i>本周完成 5 个
+                            </span>
+                            <a href="#dashboard" class="ml-auto text-ce-blue text-sm font-medium hover:underline flex items-center group/link">
+                                查看全部 <i class="fa fa-angle-right ml-1 group-hover/link:translate-x-1 transition-transform"></i>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="stat-card group">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-500 mb-1">待审核</p>
+                                <p class="text-3xl font-bold text-gray-800 stat-number">3</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-50 to-amber-100 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                <i class="fa fa-search text-amber-600 text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-center pt-3 border-t border-gray-100">
+                            <span class="text-amber-500 text-sm font-medium flex items-center">
+                                <i class="fa fa-bolt mr-1"></i>1 个需要加急
+                            </span>
+                            <a href="#dashboard" class="ml-auto text-ce-blue text-sm font-medium hover:underline flex items-center group/link">
+                                查看全部 <i class="fa fa-angle-right ml-1 group-hover/link:translate-x-1 transition-transform"></i>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="stat-card group">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-500 mb-1">完成率</p>
+                                <p class="text-3xl font-bold gradient-text stat-number">85%</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                <i class="fa fa-line-chart text-ce-blue text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-center pt-3 border-t border-gray-100">
+                            <span class="text-green-500 text-sm font-medium flex items-center">
+                                <i class="fa fa-arrow-up mr-1"></i>5% 较上月
+                            </span>
+                            <a href="#statistics" class="ml-auto text-ce-blue text-sm font-medium hover:underline flex items-center group/link">
+                                查看详情 <i class="fa fa-angle-right ml-1 group-hover/link:translate-x-1 transition-transform"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 图表和任务列表 -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- 即将到期任务 -->
+                    <div class="bg-white rounded-2xl shadow-card p-5 card-hover">
+                        <div class="flex items-center justify-between mb-5">
+                            <h3 class="text-lg font-bold text-gray-800 flex items-center">
+                                <span class="w-1.5 h-5 bg-ce-red rounded-full mr-2"></span>
+                                即将到期任务
+                            </h3>
+                            <a href="#task-submit" class="text-ce-blue text-sm font-medium hover:underline flex items-center group">
+                                查看全部 <i class="fa fa-angle-right ml-1 group-hover:translate-x-1 transition-transform"></i>
+                            </a>
+                        </div>
+                        <div class="space-y-3">
+                            <div class="task-item border-red-400 hover:border-red-500">
+                                <div class="flex items-center justify-between mb-1">
+                                    <h4 class="font-semibold text-gray-800">月度经营分析报表</h4>
+                                    <span class="status-badge bg-red-100 text-red-700">今天截止</span>
+                                </div>
+                                <p class="text-sm text-gray-500 mb-2">提交月度财务数据和分析报告</p>
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center text-xs text-gray-400">
+                                        <i class="fa fa-clock-o mr-1"></i>剩余 6 小时
+                                    </div>
+                                    <a href="#" class="text-xs text-ce-blue font-medium hover:underline">立即处理</a>
+                                </div>
+                            </div>
+                            <div class="task-item border-amber-400 hover:border-amber-500">
+                                <div class="flex items-center justify-between mb-1">
+                                    <h4 class="font-semibold text-gray-800">部门培训计划提交</h4>
+                                    <span class="status-badge bg-amber-100 text-amber-700">明天截止</span>
+                                </div>
+                                <p class="text-sm text-gray-500 mb-2">提交下季度部门培训计划</p>
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center text-xs text-gray-400">
+                                        <i class="fa fa-clock-o mr-1"></i>剩余 18 小时
+                                    </div>
+                                    <a href="#" class="text-xs text-ce-blue font-medium hover:underline">立即处理</a>
+                                </div>
+                            </div>
+                            <div class="task-item border-amber-400 hover:border-amber-500">
+                                <div class="flex items-center justify-between mb-1">
+                                    <h4 class="font-semibold text-gray-800">安全检查记录表</h4>
+                                    <span class="status-badge bg-amber-100 text-amber-700">2天后截止</span>
+                                </div>
+                                <p class="text-sm text-gray-500 mb-2">提交本月安全检查记录</p>
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center text-xs text-gray-400">
+                                        <i class="fa fa-clock-o mr-1"></i>剩余 2 天
+                                    </div>
+                                    <a href="#" class="text-xs text-ce-blue font-medium hover:underline">立即处理</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 任务完成趋势图 -->
+                    <div class="bg-white rounded-2xl shadow-card p-5 lg:col-span-2 card-hover">
+                        <div class="flex items-center justify-between mb-5">
+                            <h3 class="text-lg font-bold text-gray-800 flex items-center">
+                                <span class="w-1.5 h-5 bg-ce-blue rounded-full mr-2"></span>
+                                任务完成趋势
+                            </h3>
+                            <div class="flex space-x-2">
+                                <button class="btn-sm btn-outline">周</button>
+                                <button class="btn-sm btn-secondary">月</button>
+                                <button class="btn-sm btn-outline">季</button>
+                            </div>
+                        </div>
+                        <div class="h-64">
+                            <canvas id="taskTrendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 创建任务页面 -->
+            <div id="task-create-page" class="page-content hidden">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">创建任务</h2>
+                    <p class="text-gray-600">填写任务信息并指定完成人员。</p>
+                </div>
+
+                <!-- 简化的任务创建表单 -->
+                <div class="bg-white rounded-lg shadow-card p-6">
+                    <form id="create-task-form">
+                        <!-- 基本信息 -->
+                        <div class="mb-6">
+                            <h3 class="text-lg font-bold text-gray-800 mb-4">基本信息</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">任务名称 <span class="text-red-500">*</span></label>
+                                    <input type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent" placeholder="如：月度经营分析报表收集">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">任务分类 <span class="text-red-500">*</span></label>
+                                    <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent">
+                                        <option value="">请选择分类</option>
+                                        <option value="finance">财务类</option>
+                                        <option value="hr">人力资源类</option>
+                                        <option value="marketing">市场营销类</option>
+                                        <option value="operation">运营支持类</option>
+                                        <option value="tech">技术研发类</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">截止时间 <span class="text-red-500">*</span></label>
+                                    <input type="datetime-local" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">优先级</label>
+                                    <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent">
+                                        <option value="low">低</option>
+                                        <option value="normal" selected>普通</option>
+                                        <option value="high">高</option>
+                                        <option value="urgent">紧急</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 任务描述 -->
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">任务描述 <span class="text-red-500">*</span></label>
+                            <textarea class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent h-32" placeholder="详细描述任务内容、要求和注意事项"></textarea>
+                        </div>
+
+                        <!-- 指定人员 -->
+                        <div class="mb-6">
+                            <h3 class="text-lg font-bold text-gray-800 mb-4">指定完成人员</h3>
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="flex items-center space-x-2">
+                                        <button type="button" class="btn-sm btn-outline flex items-center"><i class="fa fa-users mr-1"></i> 按部门选择</button>
+                                        <button type="button" class="btn-sm btn-outline flex items-center"><i class="fa fa-user mr-1"></i> 按人员选择</button>
+                                    </div>
+                                    <input type="text" class="w-48 px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent" placeholder="搜索...">
+                                </div>
+                                <div class="space-y-2">
+                                    <div class="flex items-center p-2 hover:bg-gray-50 rounded">
+                                        <input type="checkbox" id="create-dept-1" class="mr-2"><label for="create-dept-1">产品技术部</label><span class="ml-2 text-xs text-gray-500">(25人)</span>
+                                    </div>
+                                    <div class="flex items-center p-2 hover:bg-gray-50 rounded">
+                                        <input type="checkbox" id="create-dept-2" class="mr-2"><label for="create-dept-2">市场营销部</label><span class="ml-2 text-xs text-gray-500">(18人)</span>
+                                    </div>
+                                    <div class="flex items-center p-2 hover:bg-gray-50 rounded">
+                                        <input type="checkbox" id="create-dept-3" class="mr-2"><label for="create-dept-3">运营支持部</label><span class="ml-2 text-xs text-gray-500">(12人)</span>
+                                    </div>
+                                </div>
+                                <p class="mt-3 pt-2 border-t text-sm text-gray-600">已选择 <span class="font-medium text-ce-blue">0</span> 个部门</p>
+                            </div>
+                        </div>
+
+                        <!-- 提交要求 -->
+                        <div class="mb-6">
+                            <h3 class="text-lg font-bold text-gray-800 mb-4">需要提交什么？</h3>
+                            <div class="border border-gray-200 rounded-lg p-4 space-y-3">
+                                <div class="flex items-center"><input type="checkbox" id="need-file" class="mr-2" checked><label for="need-file">需要上传文件</label></div>
+                                <div class="flex items-center"><input type="checkbox" id="need-note" class="mr-2"><label for="need-note">需要填写说明</label></div>
+                                <div class="pt-3 border-t">
+                                    <label class="font-medium text-gray-800">提供模板文件（可选）</label>
+                                    <button type="button" class="btn-sm btn-outline ml-2"><i class="fa fa-upload mr-1"></i> 上传模板</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 提醒设置 -->
+                        <div class="mb-6">
+                            <h3 class="text-lg font-bold text-gray-800 mb-4">提醒设置</h3>
+                            <div class="border border-gray-200 rounded-lg p-4 space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center"><input type="checkbox" id="create-remind-1" class="mr-2" checked><label for="create-remind-1">到期前提醒</label></div>
+                                    <select class="px-2 py-1 border rounded text-sm"><option>提前1天</option><option>提前2天</option></select>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center"><input type="checkbox" id="create-remind-2" class="mr-2" checked><label for="create-remind-2">到期当天提醒</label></div>
+                                    <select class="px-2 py-1 border rounded text-sm"><option>上午9点</option><option>下午6点</option></select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 提交按钮 -->
+                        <div class="flex items-center justify-between pt-4 border-t border-gray-200">
+                            <label class="flex items-center text-sm text-gray-700"><input type="checkbox" class="mr-2" checked>发布后通知执行人</label>
+                            <div class="space-x-2">
+                                <button type="button" class="btn-outline">保存草稿</button>
+                                <button type="submit" class="btn-primary">发布任务</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 任务管理页面 -->
+            <div id="task-manage-page" class="page-content hidden">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">任务管理</h2>
+                    <p class="text-gray-600">管理和追踪所有任务的执行情况。</p>
+                </div>
+
+                <!-- 筛选和搜索 -->
+                <div class="bg-white rounded-lg shadow-card p-4 mb-6">
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex flex-wrap items-center gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">任务状态</label>
+                                <select class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent">
+                                    <option value="">全部</option>
+                                    <option value="pending">待下发</option>
+                                    <option value="issued">已下发</option>
+                                    <option value="in-progress">进行中</option>
+                                    <option value="pending-review">待审核</option>
+                                    <option value="completed">已完成</option>
+                                    <option value="rejected">已驳回</option>
+                                    <option value="overdue">已逾期</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">任务类型</label>
+                                <select class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent">
+                                    <option value="">全部</option>
+                                    <option value="assign">指派型</option>
+                                    <option value="template">模板回收型</option>
+                                    <option value="self-fill">自主填报型</option>
+                                    <option value="collaboration">协同型</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">任务分类</label>
+                                <select class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent">
+                                    <option value="">全部</option>
+                                    <option value="finance">财务类</option>
+                                    <option value="hr">人力资源类</option>
+                                    <option value="marketing">市场营销类</option>
+                                    <option value="operation">运营支持类</option>
+                                    <option value="tech">技术研发类</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">时间范围</label>
+                                <select class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent">
+                                    <option value="7">最近7天</option>
+                                    <option value="30" selected>最近30天</option>
+                                    <option value="90">最近90天</option>
+                                    <option value="custom">自定义</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex items-end">
+                            <div class="relative mr-2">
+                                <input type="text" class="w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent" placeholder="搜索任务名称、描述或执行人">
+                                <i class="fa fa-search absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            </div>
+                            <button class="btn-secondary flex items-center">
+                                <i class="fa fa-filter mr-1"></i> 筛选
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 视图切换 -->
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center space-x-2">
+                        <button class="btn-sm btn-secondary flex items-center">
+                            <i class="fa fa-list mr-1"></i> 列表视图
+                        </button>
+                        <button class="btn-sm btn-outline flex items-center">
+                            <i class="fa fa-th-large mr-1"></i> 看板视图
+                        </button>
+                        <button class="btn-sm btn-outline flex items-center">
+                            <i class="fa fa-calendar mr-1"></i> 甘特图视图
+                        </button>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button class="btn-sm btn-outline flex items-center">
+                            <i class="fa fa-download mr-1"></i> 导出
+                        </button>
+                        <button class="btn-sm btn-primary flex items-center">
+                            <i class="fa fa-plus mr-1"></i> 新建任务
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 任务列表 -->
+                <div class="bg-white rounded-lg shadow-card overflow-hidden">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" class="mr-2">
+                                        任务名称
+                                    </div>
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    任务类型
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    执行人
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    截止时间
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    状态
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    操作
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" class="mr-2">
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900">月度经营分析报表收集</div>
+                                            <div class="text-xs text-gray-500">财务类 | 高优先级</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="status-badge bg-green-100 text-green-800">模板回收型</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">产品技术部、市场营销部、运营支持部</div>
+                                    <div class="text-xs text-gray-500">共55人</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    2024-03-15 18:00
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="status-badge bg-yellow-100 text-yellow-800">进行中</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <div class="flex space-x-2">
+                                        <button class="text-ce-blue hover:text-ce-blue-dark">查看</button>
+                                        <button class="text-gray-600 hover:text-gray-900">编辑</button>
+                                        <button class="text-red-600 hover:text-red-900">删除</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" class="mr-2">
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900">部门培训计划提交</div>
+                                            <div class="text-xs text-gray-500">人力资源类 | 普通优先级</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="status-badge bg-blue-100 text-blue-800">指派型</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">各部门负责人</div>
+                                    <div class="text-xs text-gray-500">共8人</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    2024-03-10 18:00
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="status-badge bg-blue-100 text-blue-800">待审核</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <div class="flex space-x-2">
+                                        <button class="text-ce-blue hover:text-ce-blue-dark">查看</button>
+                                        <button class="text-gray-600 hover:text-gray-900">编辑</button>
+                                        <button class="text-red-600 hover:text-red-900">删除</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" class="mr-2">
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900">安全检查记录表</div>
+                                            <div class="text-xs text-gray-500">运营支持类 | 普通优先级</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="status-badge bg-purple-100 text-purple-800">自主填报型</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">各部门安全负责人</div>
+                                    <div class="text-xs text-gray-500">共12人</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    2024-03-12 18:00
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="status-badge bg-red-100 text-red-800">已逾期</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <div class="flex space-x-2">
+                                        <button class="text-ce-blue hover:text-ce-blue-dark">查看</button>
+                                        <button class="text-gray-600 hover:text-gray-900">编辑</button>
+                                        <button class="text-red-600 hover:text-red-900">删除</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" class="mr-2">
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900">新系统上线准备工作</div>
+                                            <div class="text-xs text-gray-500">技术研发类 | 紧急优先级</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="status-badge bg-orange-100 text-orange-800">协同型</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">产品技术部、运营支持部、市场营销部</div>
+                                    <div class="text-xs text-gray-500">共15人</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    2024-03-20 18:00
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="status-badge bg-green-100 text-green-800">已完成</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <div class="flex space-x-2">
+                                        <button class="text-ce-blue hover:text-ce-blue-dark">查看</button>
+                                        <button class="text-gray-600 hover:text-gray-900">编辑</button>
+                                        <button class="text-red-600 hover:text-red-900">删除</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" class="mr-2">
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900">年度预算编制</div>
+                                            <div class="text-xs text-gray-500">财务类 | 高优先级</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="status-badge bg-blue-100 text-blue-800">指派型</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">财务部全体成员</div>
+                                    <div class="text-xs text-gray-500">共10人</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    2024-03-31 18:00
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="status-badge bg-gray-100 text-gray-800">已下发</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <div class="flex space-x-2">
+                                        <button class="text-ce-blue hover:text-ce-blue-dark">查看</button>
+                                        <button class="text-gray-600 hover:text-gray-900">编辑</button>
+                                        <button class="text-red-600 hover:text-red-900">删除</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="px-6 py-4 flex items-center justify-between border-t border-gray-200">
+                        <div class="text-sm text-gray-700">
+                            显示 <span class="font-medium">1</span> 到 <span class="font-medium">5</span> 条，共 <span class="font-medium">24</span> 条记录
+                        </div>
+                        <div class="flex space-x-1">
+                            <button class="px-3 py-1 border border-gray-300 rounded-md text-sm bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50" disabled>上一页</button>
+                            <button class="px-3 py-1 border border-gray-300 rounded-md text-sm bg-ce-blue text-white">1</button>
+                            <button class="px-3 py-1 border border-gray-300 rounded-md text-sm bg-white text-gray-700 hover:bg-gray-50">2</button>
+                            <button class="px-3 py-1 border border-gray-300 rounded-md text-sm bg-white text-gray-700 hover:bg-gray-50">3</button>
+                            <button class="px-3 py-1 border border-gray-300 rounded-md text-sm bg-white text-gray-700 hover:bg-gray-50">4</button>
+                            <button class="px-3 py-1 border border-gray-300 rounded-md text-sm bg-white text-gray-700 hover:bg-gray-50">5</button>
+                            <button class="px-3 py-1 border border-gray-300 rounded-md text-sm bg-white text-gray-700 hover:bg-gray-50">下一页</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 文件上传页面 -->
+            <div id="task-submit-page" class="page-content hidden">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">文件上传</h2>
+                    <p class="text-gray-600">查看待办任务并提交相关文件。</p>
+                </div>
+
+                <!-- 待办任务列表 -->
+                <div id="task-list-view">
+                    <div class="bg-white rounded-lg shadow-card p-4 mb-4">
+                        <div class="flex flex-wrap items-center gap-4">
+                            <div class="flex-1 min-w-[200px]">
+                                <div class="relative">
+                                    <input type="text" id="task-search" class="w-full px-3 py-2 pl-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent" placeholder="搜索任务名称...">
+                                    <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <select id="task-status-filter" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent">
+                                    <option value="all">全部状态</option>
+                                    <option value="pending" selected>待提交</option>
+                                    <option value="submitted">已提交</option>
+                                    <option value="rejected">已驳回</option>
+                                    <option value="overdue">已逾期</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 任务卡片列表 -->
+                    <div id="pending-task-list" class="space-y-4">
+                        <!-- 任务卡片1 - 紧急 -->
+                        <div class="bg-white rounded-lg shadow-card p-4 border-l-4 border-red-500 cursor-pointer hover:shadow-card-hover transition-all duration-300 task-card" data-task-id="1">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center space-x-2 mb-2">
+                                        <span class="status-badge bg-red-100 text-red-800">今天截止</span>
+                                        <span class="status-badge bg-orange-100 text-orange-800">高优先级</span>
+                                    </div>
+                                    <h3 class="text-lg font-bold text-gray-800 mb-1">月度经营分析报表收集</h3>
+                                    <p class="text-sm text-gray-600 mb-2">请提交2024年2月份的经营分析报表，包括收入、成本、利润等关键指标。</p>
+                                    <div class="flex items-center space-x-4 text-sm text-gray-500">
+                                        <span><i class="fa fa-clock-o mr-1"></i>截止：2024-03-15 18:00</span>
+                                        <span><i class="fa fa-file-text-o mr-1"></i>模板回收型</span>
+                                        <span><i class="fa fa-user mr-1"></i>发布人：李四（财务部）</span>
+                                    </div>
+                                </div>
+                                <div class="ml-4">
+                                    <i class="fa fa-chevron-right text-gray-400"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 任务卡片2 - 普通 -->
+                        <div class="bg-white rounded-lg shadow-card p-4 border-l-4 border-yellow-500 cursor-pointer hover:shadow-card-hover transition-all duration-300 task-card" data-task-id="2">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center space-x-2 mb-2">
+                                        <span class="status-badge bg-yellow-100 text-yellow-800">3天后截止</span>
+                                        <span class="status-badge bg-blue-100 text-blue-800">中优先级</span>
+                                    </div>
+                                    <h3 class="text-lg font-bold text-gray-800 mb-1">Q1员工培训计划</h3>
+                                    <p class="text-sm text-gray-600 mb-2">提交本部门Q1员工培训计划和预算申请。</p>
+                                    <div class="flex items-center space-x-4 text-sm text-gray-500">
+                                        <span><i class="fa fa-clock-o mr-1"></i>截止：2024-03-18 18:00</span>
+                                        <span><i class="fa fa-file-text-o mr-1"></i>指派型</span>
+                                        <span><i class="fa fa-user mr-1"></i>发布人：王五（人力资源部）</span>
+                                    </div>
+                                </div>
+                                <div class="ml-4">
+                                    <i class="fa fa-chevron-right text-gray-400"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 任务卡片3 - 已提交 -->
+                        <div class="bg-white rounded-lg shadow-card p-4 border-l-4 border-green-500 cursor-pointer hover:shadow-card-hover transition-all duration-300 task-card" data-task-id="3">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center space-x-2 mb-2">
+                                        <span class="status-badge bg-green-100 text-green-800">已提交</span>
+                                        <span class="status-badge bg-blue-100 text-blue-800">中优先级</span>
+                                    </div>
+                                    <h3 class="text-lg font-bold text-gray-800 mb-1">市场营销活动方案</h3>
+                                    <p class="text-sm text-gray-600 mb-2">提交Q2市场营销活动策划方案。</p>
+                                    <div class="flex items-center space-x-4 text-sm text-gray-500">
+                                        <span><i class="fa fa-clock-o mr-1"></i>截止：2024-03-20 18:00</span>
+                                        <span><i class="fa fa-file-text-o mr-1"></i>指派型</span>
+                                        <span><i class="fa fa-user mr-1"></i>发布人：赵六（市场部）</span>
+                                    </div>
+                                </div>
+                                <div class="ml-4">
+                                    <i class="fa fa-chevron-right text-gray-400"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 任务卡片4 - 已驳回 -->
+                        <div class="bg-white rounded-lg shadow-card p-4 border-l-4 border-purple-500 cursor-pointer hover:shadow-card-hover transition-all duration-300 task-card" data-task-id="4">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center space-x-2 mb-2">
+                                        <span class="status-badge bg-purple-100 text-purple-800">已驳回</span>
+                                        <span class="status-badge bg-orange-100 text-orange-800">高优先级</span>
+                                    </div>
+                                    <h3 class="text-lg font-bold text-gray-800 mb-1">安全检查记录表</h3>
+                                    <p class="text-sm text-gray-600 mb-2">提交本月安全检查记录，需重新修改后提交。</p>
+                                    <div class="flex items-center space-x-4 text-sm text-gray-500">
+                                        <span><i class="fa fa-clock-o mr-1"></i>截止：2024-03-12 18:00</span>
+                                        <span><i class="fa fa-file-text-o mr-1"></i>模板回收型</span>
+                                        <span><i class="fa fa-user mr-1"></i>发布人：孙七（安全部）</span>
+                                    </div>
+                                    <div class="mt-2 p-2 bg-red-50 rounded text-sm text-red-600">
+                                        <i class="fa fa-info-circle mr-1"></i>驳回原因：表格数据不完整，请补充第三项检查内容。
+                                    </div>
+                                </div>
+                                <div class="ml-4">
+                                    <i class="fa fa-chevron-right text-gray-400"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 任务卡片5 - 已逾期 -->
+                        <div class="bg-white rounded-lg shadow-card p-4 border-l-4 border-gray-500 cursor-pointer hover:shadow-card-hover transition-all duration-300 task-card" data-task-id="5">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center space-x-2 mb-2">
+                                        <span class="status-badge bg-gray-200 text-gray-700">已逾期</span>
+                                        <span class="status-badge bg-orange-100 text-orange-800">高优先级</span>
+                                    </div>
+                                    <h3 class="text-lg font-bold text-gray-800 mb-1">产品需求文档更新</h3>
+                                    <p class="text-sm text-gray-600 mb-2">更新产品需求文档，补充新功能说明。</p>
+                                    <div class="flex items-center space-x-4 text-sm text-gray-500">
+                                        <span><i class="fa fa-clock-o mr-1"></i>截止：2024-03-10 18:00</span>
+                                        <span><i class="fa fa-file-text-o mr-1"></i>协同型</span>
+                                        <span><i class="fa fa-user mr-1"></i>发布人：周八（产品部）</span>
+                                    </div>
+                                </div>
+                                <div class="ml-4">
+                                    <i class="fa fa-chevron-right text-gray-400"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 任务详情视图 -->
+                <div id="task-detail-view" class="hidden">
+                    <button id="back-to-list" class="mb-4 flex items-center text-ce-blue hover:text-ce-blue-dark transition-colors">
+                        <i class="fa fa-arrow-left mr-2"></i>返回任务列表
+                    </button>
+
+                    <div class="bg-white rounded-lg shadow-card p-6 mb-6">
+                        <div class="flex items-start justify-between mb-4">
+                            <div>
+                                <div class="flex items-center space-x-2 mb-2">
+                                    <span id="detail-status" class="status-badge bg-red-100 text-red-800">今天截止</span>
+                                    <span id="detail-priority" class="status-badge bg-orange-100 text-orange-800">高优先级</span>
+                                </div>
+                                <h3 id="detail-title" class="text-xl font-bold text-gray-800">月度经营分析报表收集</h3>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm">
+                            <div class="flex">
+                                <span class="text-gray-500 w-24">任务类型：</span>
+                                <span id="detail-type" class="text-gray-800">模板回收型</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24">截止时间：</span>
+                                <span id="detail-deadline" class="text-gray-800">2024-03-15 18:00</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24">发布人：</span>
+                                <span id="detail-publisher" class="text-gray-800">李四（财务部）</span>
+                            </div>
+                            <div class="flex">
+                                <span class="text-gray-500 w-24">剩余时间：</span>
+                                <span id="detail-remaining" class="text-red-600 font-medium">6小时</span>
+                            </div>
+                        </div>
+
+                        <div class="border-t border-gray-200 pt-4 mb-4">
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">任务描述</h4>
+                            <p id="detail-description" class="text-sm text-gray-600">请各部门提交2024年2月份的经营分析报表，包括收入、成本、利润等关键指标，并分析同比和环比变化情况。报表需按统一模板填写，如有特殊情况请在备注中说明。</p>
+                        </div>
+
+                        <div class="border-t border-gray-200 pt-4">
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">相关附件</h4>
+                            <div id="detail-attachments" class="flex flex-wrap gap-4">
+                                <a href="#" class="flex items-center text-ce-blue hover:text-ce-blue-dark">
+                                    <i class="fa fa-file-excel-o text-xl mr-1"></i>
+                                    <span class="text-sm">月度经营分析报表模板.xlsx</span>
+                                </a>
+                                <a href="#" class="flex items-center text-ce-blue hover:text-ce-blue-dark">
+                                    <i class="fa fa-file-pdf-o text-xl mr-1"></i>
+                                    <span class="text-sm">填写说明.pdf</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 提交区域 -->
+                    <div class="bg-white rounded-lg shadow-card p-6">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">提交文件</h3>
+                        
+                        <!-- 历史提交记录 -->
+                        <div id="submission-history" class="mb-6 hidden">
+                            <h4 class="text-sm font-medium text-gray-700 mb-2">历史提交记录</h4>
+                            <div class="space-y-2">
+                                <div class="p-3 bg-gray-50 rounded-lg">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <span class="text-sm font-medium text-gray-800">提交于 2024-03-14 10:30</span>
+                                        <span class="status-badge bg-yellow-100 text-yellow-800">待审核</span>
+                                    </div>
+                                    <div class="flex items-center text-sm text-gray-600">
+                                        <i class="fa fa-file-excel-o text-green-600 mr-1"></i>
+                                        <span>产品技术部-月度经营分析报表.xlsx</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <form id="submission-form">
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">完成情况说明 <span class="text-red-500">*</span></label>
+                                <textarea id="completion-note" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent h-24" placeholder="请简要描述任务完成情况..."></textarea>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">上传文件 <span class="text-red-500">*</span></label>
+                                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-ce-blue transition-colors" id="upload-area">
+                                    <input type="file" id="file-upload" class="hidden" multiple>
+                                    <div id="upload-placeholder">
+                                        <i class="fa fa-cloud-upload text-4xl text-gray-400 mb-2"></i>
+                                        <p class="text-sm text-gray-600 mb-1">点击或拖拽文件到此处上传</p>
+                                        <p class="text-xs text-gray-500">支持 Excel、Word、PDF、图片格式，单个文件不超过 50MB</p>
+                                    </div>
+                                    <div id="uploaded-files" class="text-left hidden">
+                                        <h4 class="text-sm font-medium text-gray-700 mb-2">已选择的文件</h4>
+                                        <div id="file-list" class="space-y-2"></div>
+                                        <button type="button" id="add-more-files" class="mt-3 text-sm text-ce-blue hover:underline">
+                                            <i class="fa fa-plus mr-1"></i>继续添加文件
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">备注（选填）</label>
+                                <textarea id="remark" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent h-16" placeholder="其他需要说明的事项..."></textarea>
+                            </div>
+
+                            <div class="flex items-center justify-between pt-4 border-t border-gray-200">
+                                <button type="button" id="save-draft-btn" class="btn-outline">
+                                    <i class="fa fa-save mr-1"></i>保存草稿
+                                </button>
+                                <div class="flex space-x-2">
+                                    <button type="button" id="apply-extension-btn" class="btn-outline">
+                                        <i class="fa fa-calendar-plus-o mr-1"></i>申请延期
+                                    </button>
+                                    <button type="submit" class="btn-primary">
+                                        <i class="fa fa-paper-plane mr-1"></i>提交
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 提交成功弹窗 -->
+                <div id="submit-success-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+                    <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6 text-center">
+                        <div class="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+                            <i class="fa fa-check text-green-600 text-3xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-800 mb-2">提交成功</h3>
+                        <p class="text-gray-600 mb-4">您的文件已成功提交，请等待审核。</p>
+                        <button id="close-success-modal" class="btn-primary w-full">确定</button>
+                    </div>
+                </div>
+
+                <!-- 延期申请弹窗 -->
+                <div id="extension-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+                    <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">申请延期</h3>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">申请延期至</label>
+                            <input type="datetime-local" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent">
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">延期原因 <span class="text-red-500">*</span></label>
+                            <textarea class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent h-24" placeholder="请说明延期原因..."></textarea>
+                        </div>
+                        <div class="flex justify-end space-x-2">
+                            <button id="cancel-extension" class="btn-outline">取消</button>
+                            <button id="submit-extension" class="btn-primary">提交申请</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 数据统计页面 -->
+            <div id="statistics-page" class="page-content hidden">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">数据统计</h2>
+                    <p class="text-gray-600">查看任务执行情况的统计数据和趋势分析。</p>
+                </div>
+
+                <!-- 统计筛选 -->
+                <div class="bg-white rounded-lg shadow-card p-4 mb-6">
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex flex-wrap items-center gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">统计维度</label>
+                                <select class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent">
+                                    <option value="dept">按部门</option>
+                                    <option value="user">按人员</option>
+                                    <option value="type">按任务类型</option>
+                                    <option value="category">按任务分类</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">时间范围</label>
+                                <select class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent">
+                                    <option value="7">最近7天</option>
+                                    <option value="30" selected>最近30天</option>
+                                    <option value="90">最近90天</option>
+                                    <option value="180">最近180天</option>
+                                    <option value="365">最近一年</option>
+                                    <option value="custom">自定义</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex items-end">
+                            <button class="btn-secondary flex items-center">
+                                <i class="fa fa-download mr-1"></i> 导出报表
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 统计卡片 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-white rounded-lg shadow-card p-4 card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">任务总数</p>
+                                <p class="text-2xl font-bold text-gray-800">124</p>
+                            </div>
+                            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                <i class="fa fa-tasks text-ce-blue text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-center">
+                            <span class="text-green-500 text-sm font-medium">↑ 12% 较上月</span>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-card p-4 card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">完成率</p>
+                                <p class="text-2xl font-bold text-gray-800">85%</p>
+                            </div>
+                            <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                                <i class="fa fa-check-circle text-green-600 text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-center">
+                            <span class="text-green-500 text-sm font-medium">↑ 5% 较上月</span>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-card p-4 card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">准时率</p>
+                                <p class="text-2xl font-bold text-gray-800">78%</p>
+                            </div>
+                            <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
+                                <i class="fa fa-clock-o text-yellow-600 text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-center">
+                            <span class="text-red-500 text-sm font-medium">↓ 3% 较上月</span>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-card p-4 card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">驳回率</p>
+                                <p class="text-2xl font-bold text-gray-800">8%</p>
+                            </div>
+                            <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                                <i class="fa fa-undo text-red-600 text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-center">
+                            <span class="text-green-500 text-sm font-medium">↓ 2% 较上月</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 图表 -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-white rounded-lg shadow-card p-4 card-hover">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold text-gray-800">任务完成趋势</h3>
+                            <div class="flex space-x-2">
+                                <button class="btn-sm btn-outline">周</button>
+                                <button class="btn-sm btn-secondary">月</button>
+                                <button class="btn-sm btn-outline">季</button>
+                            </div>
+                        </div>
+                        <div class="h-64">
+                            <canvas id="completionTrendChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-card p-4 card-hover">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold text-gray-800">任务类型分布</h3>
+                            <div class="flex space-x-2">
+                                <button class="btn-sm btn-secondary">数量</button>
+                                <button class="btn-sm btn-outline">占比</button>
+                            </div>
+                        </div>
+                        <div class="h-64">
+                            <canvas id="taskTypeChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 部门排名 -->
+                <div class="bg-white rounded-lg shadow-card p-4 mb-6 card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold text-gray-800">部门任务完成情况排名</h3>
+                        <div class="flex space-x-2">
+                            <button class="btn-sm btn-secondary">完成率</button>
+                            <button class="btn-sm btn-outline">准时率</button>
+                            <button class="btn-sm btn-outline">任务量</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">排名</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">部门</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">任务数</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">完成率</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">准时率</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">驳回率</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">趋势</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="w-6 h-6 rounded-full bg-yellow-500 text-white flex items-center justify-center text-xs font-bold">1</div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900">产品技术部</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">35</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <span class="text-sm font-medium text-gray-900 mr-2">92%</span>
+                                            <div class="w-24 bg-gray-200 rounded-full h-2">
+                                                <div class="bg-green-500 h-2 rounded-full" style="width: 92%"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">88%</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">5%</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="text-green-500 flex items-center">
+                                            <i class="fa fa-arrow-up mr-1"></i> 3%
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="w-6 h-6 rounded-full bg-gray-300 text-white flex items-center justify-center text-xs font-bold">2</div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900">市场营销部</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">28</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <span class="text-sm font-medium text-gray-900 mr-2">88%</span>
+                                            <div class="w-24 bg-gray-200 rounded-full h-2">
+                                                <div class="bg-green-500 h-2 rounded-full" style="width: 88%"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">82%</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">7%</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="text-green-500 flex items-center">
+                                            <i class="fa fa-arrow-up mr-1"></i> 2%
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="w-6 h-6 rounded-full bg-orange-400 text-white flex items-center justify-center text-xs font-bold">3</div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900">财务部</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">22</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <span class="text-sm font-medium text-gray-900 mr-2">85%</span>
+                                            <div class="w-24 bg-gray-200 rounded-full h-2">
+                                                <div class="bg-green-500 h-2 rounded-full" style="width: 85%"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">90%</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">6%</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="text-red-500 flex items-center">
+                                            <i class="fa fa-arrow-down mr-1"></i> 1%
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="w-6 h-6 rounded-full bg-gray-200 text-gray-700 border border-gray-300 flex items-center justify-center text-xs font-bold">4</div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900">人力资源部</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">18</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <span class="text-sm font-medium text-gray-900 mr-2">80%</span>
+                                            <div class="w-24 bg-gray-200 rounded-full h-2">
+                                                <div class="bg-yellow-500 h-2 rounded-full" style="width: 80%"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">75%</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">9%</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="text-green-500 flex items-center">
+                                            <i class="fa fa-arrow-up mr-1"></i> 4%
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="w-6 h-6 rounded-full bg-gray-200 text-gray-700 border border-gray-300 flex items-center justify-center text-xs font-bold">5</div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm font-medium text-gray-900">运营支持部</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">21</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <span class="text-sm font-medium text-gray-900 mr-2">75%</span>
+                                            <div class="w-24 bg-gray-200 rounded-full h-2">
+                                                <div class="bg-yellow-500 h-2 rounded-full" style="width: 75%"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">68%</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">12%</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="text-red-500 flex items-center">
+                                            <i class="fa fa-arrow-down mr-1"></i> 3%
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 预警信息 -->
+                <div class="bg-white rounded-lg shadow-card p-4 card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold text-gray-800">预警信息</h3>
+                        <div class="flex space-x-2">
+                            <button class="btn-sm btn-secondary">全部</button>
+                            <button class="btn-sm btn-outline">红色</button>
+                            <button class="btn-sm btn-outline">橙色</button>
+                            <button class="btn-sm btn-outline">黄色</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">预警级别</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">预警内容</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">相关任务</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">相关部门/人员</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">预警时间</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="status-badge bg-red-100 text-red-800">红色预警</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">任务已逾期24小时</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">安全检查记录表</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">运营支持部</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2024-03-13 09:00</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <button class="text-ce-blue hover:text-ce-blue-dark">处理</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="status-badge bg-orange-100 text-orange-800">橙色预警</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">任务即将在12小时后截止</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">月度经营分析报表收集</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">运营支持部（15人未提交）</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2024-03-15 06:00</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <button class="text-ce-blue hover:text-ce-blue-dark">处理</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="status-badge bg-yellow-100 text-yellow-800">黄色预警</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">任务进度滞后</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">新系统上线准备工作</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">市场营销部</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2024-03-18 10:00</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <button class="text-ce-blue hover:text-ce-blue-dark">处理</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="status-badge bg-red-100 text-red-800">红色预警</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">人员连续3次逾期</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">多个任务</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">王五（运营支持部）</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">2024-03-12 18:00</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <button class="text-ce-blue hover:text-ce-blue-dark">处理</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 系统设置页面 -->
+            <div id="settings-page" class="page-content hidden">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">系统设置</h2>
+                    <p class="text-gray-600">配置系统参数和个人偏好。</p>
+                </div>
+
+                <!-- 设置选项卡 -->
+                <div class="bg-white rounded-lg shadow-card overflow-hidden">
+                    <div class="border-b border-gray-200">
+                        <nav class="flex -mb-px">
+                            <button class="tab-button active" data-tab="personal">个人信息</button>
+                            <button class="tab-button" data-tab="notification">通知设置</button>
+                            <button class="tab-button" data-tab="security">安全设置</button>
+                            <button class="tab-button" data-tab="system">系统配置</button>
+                        </nav>
+                    </div>
+
+                    <!-- 个人信息设置 -->
+                    <div id="personal-tab" class="tab-content p-6">
+                        <div class="max-w-2xl">
+                            <div class="flex items-center mb-6">
+                                <div class="w-20 h-20 rounded-full bg-ce-blue text-white flex items-center justify-center text-3xl font-bold">
+                                    张
+                                </div>
+                                <div class="ml-4">
+                                    <button class="btn-sm btn-outline">更换头像</button>
+                                    <p class="text-xs text-gray-500 mt-1">支持 JPG、PNG 格式，最大 2MB</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">姓名</label>
+                                    <input type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent" value="张三" disabled>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">工号</label>
+                                    <input type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent" value="U1001" disabled>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">部门</label>
+                                    <input type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent" value="产品技术部" disabled>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">职位</label>
+                                    <input type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent" value="产品经理" disabled>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">手机号码</label>
+                                    <input type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent" value="138****1234">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">电子邮箱</label>
+                                    <input type="email" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent" value="zhangsan@company.com">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">个人简介</label>
+                                    <textarea class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent h-24" placeholder="请输入个人简介"></textarea>
+                                </div>
+                            </div>
+                            <div class="mt-6 flex justify-end">
+                                <button class="btn-primary">保存修改</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 通知设置 -->
+                    <div id="notification-tab" class="tab-content p-6 hidden">
+                        <div class="max-w-2xl">
+                            <h3 class="text-lg font-bold text-gray-800 mb-4">通知设置</h3>
+                            <div class="space-y-6">
+                                <div>
+                                    <h4 class="font-medium text-gray-800 mb-3">任务提醒</h4>
+                                    <div class="space-y-3">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center">
+                                                <input type="checkbox" id="notify-task-assign" class="mr-2" checked>
+                                                <label for="notify-task-assign" class="font-medium text-gray-800">新任务指派通知</label>
+                                            </div>
+                                            <div class="flex items-center space-x-2">
+                                                <label class="inline-flex items-center">
+                                                    <input type="checkbox" class="mr-1" checked>
+                                                    <span class="text-xs text-gray-600">应用内</span>
+                                                </label>
+                                                <label class="inline-flex items-center">
+                                                    <input type="checkbox" class="mr-1" checked>
+                                                    <span class="text-xs text-gray-600">邮件</span>
+                                                </label>
+                                                <label class="inline-flex items-center">
+                                                    <input type="checkbox" class="mr-1">
+                                                    <span class="text-xs text-gray-600">短信</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center">
+                                                <input type="checkbox" id="notify-task-due" class="mr-2" checked>
+                                                <label for="notify-task-due" class="font-medium text-gray-800">任务到期提醒</label>
+                                            </div>
+                                            <div class="flex items-center space-x-2">
+                                                <label class="inline-flex items-center">
+                                                    <input type="checkbox" class="mr-1" checked>
+                                                    <span class="text-xs text-gray-600">应用内</span>
+                                                </label>
+                                                <label class="inline-flex items-center">
+                                                    <input type="checkbox" class="mr-1" checked>
+                                                    <span class="text-xs text-gray-600">邮件</span>
+                                                </label>
+                                                <label class="inline-flex items-center">
+                                                    <input type="checkbox" class="mr-1" checked>
+                                                    <span class="text-xs text-gray-600">短信</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center">
+                                                <input type="checkbox" id="notify-task-overdue" class="mr-2" checked>
+                                                <label for="notify-task-overdue" class="font-medium text-gray-800">任务逾期通知</label>
+                                            </div>
+                                            <div class="flex items-center space-x-2">
+                                                <label class="inline-flex items-center">
+                                                    <input type="checkbox" class="mr-1" checked>
+                                                    <span class="text-xs text-gray-600">应用内</span>
+                                                </label>
+                                                <label class="inline-flex items-center">
+                                                    <input type="checkbox" class="mr-1" checked>
+                                                    <span class="text-xs text-gray-600">邮件</span>
+                                                </label>
+                                                <label class="inline-flex items-center">
+                                                    <input type="checkbox" class="mr-1" checked>
+                                                    <span class="text-xs text-gray-600">短信</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center">
+                                                <input type="checkbox" id="notify-task-review" class="mr-2" checked>
+                                                <label for="notify-task-review" class="font-medium text-gray-800">任务审核结果通知</label>
+                                            </div>
+                                            <div class="flex items-center space-x-2">
+                                                <label class="inline-flex items-center">
+                                                    <input type="checkbox" class="mr-1" checked>
+                                                    <span class="text-xs text-gray-600">应用内</span>
+                                                </label>
+                                                <label class="inline-flex items-center">
+                                                    <input type="checkbox" class="mr-1" checked>
+                                                    <span class="text-xs text-gray-600">邮件</span>
+                                                </label>
+                                                <label class="inline-flex items-center">
+                                                    <input type="checkbox" class="mr-1">
+                                                    <span class="text-xs text-gray-600">短信</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 class="font-medium text-gray-800 mb-3">系统通知</h4>
+                                    <div class="space-y-3">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center">
+                                                <input type="checkbox" id="notify-system-update" class="mr-2" checked>
+                                                <label for="notify-system-update" class="font-medium text-gray-800">系统更新通知</label>
+                                            </div>
+                                            <div class="flex items-center space-x-2">
+                                                <label class="inline-flex items-center">
+                                                    <input type="checkbox" class="mr-1" checked>
+                                                    <span class="text-xs text-gray-600">应用内</span>
+                                                </label>
+                                                <label class="inline-flex items-center">
+                                                    <input type="checkbox" class="mr-1" checked>
+                                                    <span class="text-xs text-gray-600">邮件</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center">
+                                                <input type="checkbox" id="notify-system-announce" class="mr-2" checked>
+                                                <label for="notify-system-announce" class="font-medium text-gray-800">系统公告</label>
+                                            </div>
+                                            <div class="flex items-center space-x-2">
+                                                <label class="inline-flex items-center">
+                                                    <input type="checkbox" class="mr-1" checked>
+                                                    <span class="text-xs text-gray-600">应用内</span>
+                                                </label>
+                                                <label class="inline-flex items-center">
+                                                    <input type="checkbox" class="mr-1" checked>
+                                                    <span class="text-xs text-gray-600">邮件</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 class="font-medium text-gray-800 mb-3">免打扰时间</h4>
+                                    <div class="flex items-center space-x-4">
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox" id="do-not-disturb" class="mr-2">
+                                            <span class="font-medium text-gray-800">启用免打扰</span>
+                                        </label>
+                                        <div class="flex items-center space-x-2">
+                                            <input type="time" class="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent" value="22:00">
+                                            <span class="text-gray-600">至</span>
+                                            <input type="time" class="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent" value="08:00">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-6 flex justify-end">
+                                <button class="btn-primary">保存设置</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 安全设置 -->
+                    <div id="security-tab" class="tab-content p-6 hidden">
+                        <div class="max-w-2xl">
+                            <h3 class="text-lg font-bold text-gray-800 mb-4">安全设置</h3>
+                            <div class="space-y-6">
+                                <div>
+                                    <h4 class="font-medium text-gray-800 mb-3">修改密码</h4>
+                                    <div class="space-y-3">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">当前密码</label>
+                                            <input type="password" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent" placeholder="请输入当前密码">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">新密码</label>
+                                            <input type="password" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent" placeholder="请输入新密码">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">确认新密码</label>
+                                            <input type="password" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent" placeholder="请再次输入新密码">
+                                        </div>
+                                    </div>
+                                    <div class="mt-4">
+                                        <button class="btn-primary">修改密码</button>
+                                    </div>
+                                </div>
+                                <div class="border-t border-gray-200 pt-6">
+                                    <h4 class="font-medium text-gray-800 mb-3">登录设备管理</h4>
+                                    <div class="space-y-3">
+                                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
+                                            <div>
+                                                <div class="font-medium text-gray-800">Chrome / Windows</div>
+                                                <div class="text-xs text-gray-500">IP: 192.168.1.100 | 上次登录: 2024-03-10 09:30</div>
+                                            </div>
+                                            <span class="status-badge bg-green-100 text-green-800">当前登录</span>
+                                        </div>
+                                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
+                                            <div>
+                                                <div class="font-medium text-gray-800">Safari / iOS</div>
+                                                <div class="text-xs text-gray-500">IP: 192.168.1.101 | 上次登录: 2024-03-09 18:15</div>
+                                            </div>
+                                            <button class="text-red-600 hover:text-red-900 text-sm">强制下线</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="border-t border-gray-200 pt-6">
+                                    <h4 class="font-medium text-gray-800 mb-3">账号安全</h4>
+                                    <div class="space-y-3">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center">
+                                                <input type="checkbox" id="two-factor-auth" class="mr-2">
+                                                <label for="two-factor-auth" class="font-medium text-gray-800">启用两步验证</label>
+                                            </div>
+                                            <button class="btn-sm btn-outline">设置</button>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center">
+                                                <input type="checkbox" id="login-notification" class="mr-2" checked>
+                                                <label for="login-notification" class="font-medium text-gray-800">登录通知</label>
+                                            </div>
+                                            <button class="btn-sm btn-outline">设置</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 系统配置 -->
+                    <div id="system-tab" class="tab-content p-6 hidden">
+                        <div class="max-w-2xl">
+                            <h3 class="text-lg font-bold text-gray-800 mb-4">系统配置</h3>
+                            <div class="space-y-6">
+                                <div>
+                                    <h4 class="font-medium text-gray-800 mb-3">基本设置</h4>
+                                    <div class="space-y-3">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">系统名称</label>
+                                            <input type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent" value="任务分发与回销追踪平台">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">系统Logo</label>
+                                            <div class="flex items-center space-x-4">
+                                                <img src="logo.png" alt="中国东方航空" class="h-10">
+                                                <button class="btn-sm btn-outline">更换Logo</button>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">默认语言</label>
+                                            <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent">
+                                                <option value="zh-CN" selected>简体中文</option>
+                                                <option value="en-US">English</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">时区设置</label>
+                                            <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent">
+                                                <option value="Asia/Shanghai" selected>(GMT+8:00) 北京时间</option>
+                                                <option value="America/New_York">(GMT-5:00) 纽约时间</option>
+                                                <option value="Europe/London">(GMT+0:00) 伦敦时间</option>
+                                                <option value="Asia/Tokyo">(GMT+9:00) 东京时间</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="border-t border-gray-200 pt-6">
+                                    <h4 class="font-medium text-gray-800 mb-3">任务设置</h4>
+                                    <div class="space-y-3">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">任务默认截止时间</label>
+                                            <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent">
+                                                <option value="24">创建后24小时</option>
+                                                <option value="48">创建后48小时</option>
+                                                <option value="72" selected>创建后72小时</option>
+                                                <option value="168">创建后7天</option>
+                                                <option value="336">创建后14天</option>
+                                                <option value="custom">自定义</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">默认提醒时间</label>
+                                            <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent">
+                                                <option value="1">到期前1天</option>
+                                                <option value="2" selected>到期前2天</option>
+                                                <option value="3">到期前3天</option>
+                                                <option value="6">到期前6小时</option>
+                                                <option value="12">到期前12小时</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">允许逾期提交</label>
+                                            <div class="flex items-center space-x-4 mt-1">
+                                                <label class="inline-flex items-center">
+                                                    <input type="radio" name="allow-overdue" value="yes" class="mr-1" checked>
+                                                    <span class="text-sm text-gray-800">允许</span>
+                                                </label>
+                                                <label class="inline-flex items-center">
+                                                    <input type="radio" name="allow-overdue" value="no" class="mr-1">
+                                                    <span class="text-sm text-gray-800">不允许</span>
+                                                </label>
+                                                <label class="inline-flex items-center">
+                                                    <input type="radio" name="allow-overdue" value="limited" class="mr-1">
+                                                    <span class="text-sm text-gray-800">允许但限制时间</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">逾期提交时间限制</label>
+                                            <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent">
+                                                <option value="24">逾期后24小时内</option>
+                                                <option value="48">逾期后48小时内</option>
+                                                <option value="72">逾期后72小时内</option>
+                                                <option value="168">逾期后7天内</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="border-t border-gray-200 pt-6">
+                                    <h4 class="font-medium text-gray-800 mb-3">文件设置</h4>
+                                    <div class="space-y-3">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">最大文件大小</label>
+                                            <div class="flex items-center space-x-2">
+                                                <input type="number" class="w-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent" value="50">
+                                                <span class="text-gray-600">MB</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">允许的文件类型</label>
+                                            <div class="flex flex-wrap gap-2">
+                                                <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm">.doc</span>
+                                                <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm">.docx</span>
+                                                <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm">.xls</span>
+                                                <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm">.xlsx</span>
+                                                <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm">.pdf</span>
+                                                <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm">.ppt</span>
+                                                <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm">.pptx</span>
+                                                <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm">.jpg</span>
+                                                <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm">.png</span>
+                                                <button class="px-2 py-1 border border-dashed border-gray-300 rounded text-sm text-gray-600 hover:bg-gray-50">+ 添加</button>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">文件存储位置</label>
+                                            <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-ce-blue focus:border-transparent">
+                                                <option value="local">本地存储</option>
+                                                <option value="oss" selected>阿里云OSS</option>
+                                                <option value="cos">腾讯云COS</option>
+                                                <option value="qiniu">七牛云</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">启用文件版本控制</label>
+                                            <div class="flex items-center space-x-4 mt-1">
+                                                <label class="inline-flex items-center">
+                                                    <input type="radio" name="file-version" value="yes" class="mr-1" checked>
+                                                    <span class="text-sm text-gray-800">启用</span>
+                                                </label>
+                                                <label class="inline-flex items-center">
+                                                    <input type="radio" name="file-version" value="no" class="mr-1">
+                                                    <span class="text-sm text-gray-800">不启用</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-6 flex justify-end">
+                                <button class="btn-primary">保存配置</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 提交成功弹窗 -->
+    <div id="success-modal" class="fixed inset-0 flex items-center justify-center z-50 hidden">
+        <div class="absolute inset-0 bg-black opacity-50"></div>
+        <div class="bg-white rounded-lg shadow-lg p-6 max-w-md w-full relative z-10">
+            <div class="text-center">
+                <div class="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+                    <i class="fa fa-check text-green-500 text-3xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 mb-2">提交成功</h3>
+                <p class="text-gray-600 mb-6">您的文件上传已成功提交，等待审核。</p>
+                <div class="flex justify-center space-x-4">
+                    <button id="close-modal" class="btn-outline">关闭</button>
+                    <button class="btn-primary">查看详情</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+        
+        // 页面切换
+        document.addEventListener('DOMContentLoaded', function() {
+            // 导航链接点击事件
+            const navLinks = document.querySelectorAll('.nav-link');
+            const pageContents = document.querySelectorAll('.page-content');
+            
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // 移除所有导航链接的活动状态
+                    navLinks.forEach(item => item.classList.remove('active'));
+                    
+                    // 添加当前链接的活动状态
+                    this.classList.add('active');
+                    
+                    // 移动端：关闭侧边栏
+                    if (window.innerWidth <= 768) {
+                        sidebar.classList.remove('active');
+                        if (sidebarOverlay) {
+                            sidebarOverlay.classList.remove('active');
+                        }
+                    }
+                    
+                    // 获取目标页面ID
+                    const targetId = this.getAttribute('data-page');
+                    
+                    // 隐藏所有页面内容
+                    pageContents.forEach(page => page.classList.add('hidden'));
+                    
+                    // 显示目标页面内容
+                    const targetPage = document.getElementById(`${targetId}-page`);
+                    if (targetPage) {
+                        targetPage.classList.remove('hidden');
+                    }
+                });
+            });
+            
+            // 文件上传页面交互
+            const taskCards = document.querySelectorAll('.task-card');
+            const taskListView = document.getElementById('task-list-view');
+            const taskDetailView = document.getElementById('task-detail-view');
+            const backToListBtn = document.getElementById('back-to-list');
+            
+            // 任务数据
+            const taskData = {
+                '1': {
+                    title: '月度经营分析报表收集',
+                    status: '今天截止',
+                    statusClass: 'bg-red-100 text-red-800',
+                    priority: '高优先级',
+                    priorityClass: 'bg-orange-100 text-orange-800',
+                    type: '模板回收型',
+                    deadline: '2024-03-15 18:00',
+                    publisher: '李四（财务部）',
+                    remaining: '6小时',
+                    description: '请各部门提交2024年2月份的经营分析报表，包括收入、成本、利润等关键指标，并分析同比和环比变化情况。报表需按统一模板填写，如有特殊情况请在备注中说明。'
+                },
+                '2': {
+                    title: 'Q1员工培训计划',
+                    status: '3天后截止',
+                    statusClass: 'bg-yellow-100 text-yellow-800',
+                    priority: '中优先级',
+                    priorityClass: 'bg-blue-100 text-blue-800',
+                    type: '指派型',
+                    deadline: '2024-03-18 18:00',
+                    publisher: '王五（人力资源部）',
+                    remaining: '3天',
+                    description: '提交本部门Q1员工培训计划和预算申请，包括培训目标、培训内容、培训时间安排和预算明细。'
+                },
+                '3': {
+                    title: '市场营销活动方案',
+                    status: '已提交',
+                    statusClass: 'bg-green-100 text-green-800',
+                    priority: '中优先级',
+                    priorityClass: 'bg-blue-100 text-blue-800',
+                    type: '指派型',
+                    deadline: '2024-03-20 18:00',
+                    publisher: '赵六（市场部）',
+                    remaining: '5天',
+                    description: '提交Q2市场营销活动策划方案，包括活动目标、活动内容、预算和预期效果。'
+                },
+                '4': {
+                    title: '安全检查记录表',
+                    status: '已驳回',
+                    statusClass: 'bg-purple-100 text-purple-800',
+                    priority: '高优先级',
+                    priorityClass: 'bg-orange-100 text-orange-800',
+                    type: '模板回收型',
+                    deadline: '2024-03-12 18:00',
+                    publisher: '孙七（安全部）',
+                    remaining: '已逾期',
+                    description: '提交本月安全检查记录，需重新修改后提交。'
+                },
+                '5': {
+                    title: '产品需求文档更新',
+                    status: '已逾期',
+                    statusClass: 'bg-gray-200 text-gray-700',
+                    priority: '高优先级',
+                    priorityClass: 'bg-orange-100 text-orange-800',
+                    type: '协同型',
+                    deadline: '2024-03-10 18:00',
+                    publisher: '周八（产品部）',
+                    remaining: '逾期2天',
+                    description: '更新产品需求文档，补充新功能说明。'
+                }
+            };
+            
+            // 点击任务卡片进入详情
+            taskCards.forEach(card => {
+                card.addEventListener('click', function() {
+                    const taskId = this.getAttribute('data-task-id');
+                    const task = taskData[taskId];
+                    
+                    if (task) {
+                        document.getElementById('detail-title').textContent = task.title;
+                        document.getElementById('detail-status').textContent = task.status;
+                        document.getElementById('detail-status').className = 'status-badge ' + task.statusClass;
+                        document.getElementById('detail-priority').textContent = task.priority;
+                        document.getElementById('detail-priority').className = 'status-badge ' + task.priorityClass;
+                        document.getElementById('detail-type').textContent = task.type;
+                        document.getElementById('detail-deadline').textContent = task.deadline;
+                        document.getElementById('detail-publisher').textContent = task.publisher;
+                        document.getElementById('detail-remaining').textContent = task.remaining;
+                        document.getElementById('detail-description').textContent = task.description;
+                    }
+                    
+                    taskListView.classList.add('hidden');
+                    taskDetailView.classList.remove('hidden');
+                });
+            });
+            
+            // 返回任务列表
+            if (backToListBtn) {
+                backToListBtn.addEventListener('click', function() {
+                    taskDetailView.classList.add('hidden');
+                    taskListView.classList.remove('hidden');
+                });
+            }
+            
+            // 文件上传区域交互
+            const uploadArea = document.getElementById('upload-area');
+            const fileUploadInput = document.getElementById('file-upload');
+            const uploadPlaceholder = document.getElementById('upload-placeholder');
+            const uploadedFiles = document.getElementById('uploaded-files');
+            const fileListContainer = document.getElementById('file-list');
+            const addMoreFilesBtn = document.getElementById('add-more-files');
+            
+            let selectedFiles = [];
+            
+            if (uploadArea && fileUploadInput) {
+                uploadArea.addEventListener('click', function(e) {
+                    if (e.target.tagName !== 'BUTTON' || e.target.id === 'add-more-files') {
+                        fileUploadInput.click();
+                    }
+                });
+                
+                uploadArea.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    this.classList.add('border-ce-blue');
+                });
+                
+                uploadArea.addEventListener('dragleave', function(e) {
+                    e.preventDefault();
+                    this.classList.remove('border-ce-blue');
+                });
+                
+                uploadArea.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    this.classList.remove('border-ce-blue');
+                    
+                    const files = e.dataTransfer.files;
+                    handleFiles(files);
+                });
+                
+                fileUploadInput.addEventListener('change', function() {
+                    handleFiles(this.files);
+                });
+            }
+            
+            function handleFiles(files) {
+                for (let file of files) {
+                    selectedFiles.push(file);
+                }
+                updateFileList();
+            }
+            
+            function updateFileList() {
+                if (selectedFiles.length > 0) {
+                    uploadPlaceholder.classList.add('hidden');
+                    uploadedFiles.classList.remove('hidden');
+                    
+                    fileListContainer.innerHTML = '';
+                    selectedFiles.forEach((file, index) => {
+                        const fileItem = document.createElement('div');
+                        fileItem.className = 'flex items-center justify-between p-2 bg-gray-50 rounded';
+                        
+                        const iconClass = getFileIcon(file.name);
+                        const fileSize = formatFileSize(file.size);
+                        
+                        fileItem.innerHTML = `
+                            <div class="flex items-center">
+                                <i class="${iconClass} text-xl mr-2"></i>
+                                <span class="text-sm text-gray-800">${file.name}</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-xs text-gray-500">${fileSize}</span>
+                                <button type="button" class="text-red-600 hover:text-red-900 remove-file" data-index="${index}">
+                                    <i class="fa fa-times"></i>
+                                </button>
+                            </div>
+                        `;
+                        
+                        fileListContainer.appendChild(fileItem);
+                    });
+                    
+                    // 添加删除文件事件
+                    document.querySelectorAll('.remove-file').forEach(btn => {
+                        btn.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            const index = parseInt(this.getAttribute('data-index'));
+                            selectedFiles.splice(index, 1);
+                            updateFileList();
+                            
+                            if (selectedFiles.length === 0) {
+                                uploadPlaceholder.classList.remove('hidden');
+                                uploadedFiles.classList.add('hidden');
+                            }
+                        });
+                    });
+                }
+            }
+            
+            function getFileIcon(filename) {
+                const ext = filename.split('.').pop().toLowerCase();
+                if (['xlsx', 'xls', 'csv'].includes(ext)) {
+                    return 'fa fa-file-excel-o text-green-600';
+                } else if (['docx', 'doc'].includes(ext)) {
+                    return 'fa fa-file-word-o text-blue-600';
+                } else if (['pdf'].includes(ext)) {
+                    return 'fa fa-file-pdf-o text-red-600';
+                } else if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) {
+                    return 'fa fa-file-image-o text-purple-600';
+                } else {
+                    return 'fa fa-file-o text-gray-600';
+                }
+            }
+            
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+            
+            // 提交表单
+            const submissionForm = document.getElementById('submission-form');
+            const submitSuccessModal = document.getElementById('submit-success-modal');
+            const closeSuccessModalBtn = document.getElementById('close-success-modal');
+            
+            if (submissionForm) {
+                submissionForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    if (selectedFiles.length === 0) {
+                        // 使用自定义提示而不是 alert
+                        const toast = document.createElement('div');
+                        toast.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-3 rounded-lg shadow-lg z-50 animate-slide-up';
+                        toast.innerHTML = '<i class="fa fa-exclamation-circle mr-2"></i>请选择要上传的文件';
+                        document.body.appendChild(toast);
+                        setTimeout(() => toast.remove(), 3000);
+                        return;
+                    }
+                    
+                    submitSuccessModal.classList.remove('hidden');
+                });
+            }
+            
+            if (closeSuccessModalBtn) {
+                closeSuccessModalBtn.addEventListener('click', function() {
+                    submitSuccessModal.classList.add('hidden');
+                    // 重置表单
+                    selectedFiles = [];
+                    if (uploadPlaceholder) uploadPlaceholder.classList.remove('hidden');
+                    if (uploadedFiles) uploadedFiles.classList.add('hidden');
+                    if (fileListContainer) fileListContainer.innerHTML = '';
+                    if (submissionForm) submissionForm.reset();
+                    
+                    // 返回列表
+                    if (taskDetailView) taskDetailView.classList.add('hidden');
+                    if (taskListView) taskListView.classList.remove('hidden');
+                });
+            }
+            
+            // 延期申请弹窗
+            const applyExtensionBtn = document.getElementById('apply-extension-btn');
+            const extensionModal = document.getElementById('extension-modal');
+            const cancelExtensionBtn = document.getElementById('cancel-extension');
+            const submitExtensionBtn = document.getElementById('submit-extension');
+            
+            if (applyExtensionBtn && extensionModal) {
+                applyExtensionBtn.addEventListener('click', function() {
+                    extensionModal.classList.remove('hidden');
+                });
+            }
+            
+            if (cancelExtensionBtn && extensionModal) {
+                cancelExtensionBtn.addEventListener('click', function() {
+                    extensionModal.classList.add('hidden');
+                });
+            }
+            
+            if (submitExtensionBtn && extensionModal) {
+                submitExtensionBtn.addEventListener('click', function() {
+                    extensionModal.classList.add('hidden');
+                    const toast = document.createElement('div');
+                    toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg z-50 animate-slide-up';
+                    toast.innerHTML = '<i class="fa fa-check-circle mr-2"></i>延期申请已提交，请等待审批';
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 3000);
+                });
+            }
+            
+            // 保存草稿
+            const saveDraftBtn = document.getElementById('save-draft-btn');
+            if (saveDraftBtn) {
+                saveDraftBtn.addEventListener('click', function() {
+                    const toast = document.createElement('div');
+                    toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg z-50 animate-slide-up';
+                    toast.innerHTML = '<i class="fa fa-check-circle mr-2"></i>草稿已保存';
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 3000);
+                });
+            }
+            
+            // 设置选项卡
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            tabButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    
+                    // 移除所有选项卡按钮的活动状态
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    
+                    // 添加当前按钮的活动状态
+                    this.classList.add('active');
+                    
+                    // 隐藏所有选项卡内容
+                    tabContents.forEach(content => content.classList.add('hidden'));
+                    
+                    // 显示目标选项卡内容
+                    document.getElementById(`${tabId}-tab`).classList.remove('hidden');
+                });
+            });
+            
+            // 初始化图表
+            initCharts();
+        });
+        
+        // 初始化图表
+        function initCharts() {
+            // 任务完成趋势图
+            const taskTrendCtx = document.getElementById('taskTrendChart');
+            if (taskTrendCtx) {
+                new Chart(taskTrendCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
+                        datasets: [
+                            {
+                                label: '已完成任务',
+                                data: [65, 78, 80, 74, 85, 90],
+                                borderColor: '#00227F',
+                                backgroundColor: 'rgba(0, 34, 127, 0.1)',
+                                tension: 0.4,
+                                fill: true
+                            },
+                            {
+                                label: '逾期任务',
+                                data: [15, 12, 10, 14, 8, 5],
+                                borderColor: '#E50000',
+                                backgroundColor: 'rgba(229, 0, 0, 0.1)',
+                                tension: 0.4,
+                                fill: true
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // 完成率趋势图
+            const completionTrendCtx = document.getElementById('completionTrendChart');
+            if (completionTrendCtx) {
+                new Chart(completionTrendCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
+                        datasets: [
+                            {
+                                label: '完成率',
+                                data: [75, 78, 82, 79, 83, 85],
+                                borderColor: '#00227F',
+                                backgroundColor: 'rgba(0, 34, 127, 0.1)',
+                                tension: 0.4,
+                                fill: true,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: '准时率',
+                                data: [70, 72, 75, 73, 76, 78],
+                                borderColor: '#4DA1FF',
+                                backgroundColor: 'rgba(77, 161, 255, 0.1)',
+                                tension: 0.4,
+                                fill: true,
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: '任务总量',
+                                data: [45, 52, 48, 56, 50, 55],
+                                borderColor: '#9E9E9E',
+                                backgroundColor: 'rgba(158, 158, 158, 0.1)',
+                                tension: 0.4,
+                                fill: false,
+                                yAxisID: 'y1'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            }
+                        },
+                        scales: {
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                title: {
+                                    display: true,
+                                    text: '百分比 (%)'
+                                },
+                                min: 0,
+                                max: 100
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                title: {
+                                    display: true,
+                                    text: '任务数量'
+                                },
+                                min: 0,
+                                max: 100,
+                                grid: {
+                                    drawOnChartArea: false,
+                                },
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // 任务类型分布图
+            const taskTypeCtx = document.getElementById('taskTypeChart');
+            if (taskTypeCtx) {
+                new Chart(taskTypeCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['指派型', '模板回收型', '自主填报型', '协同型'],
+                        datasets: [{
+                            data: [45, 25, 15, 15],
+                            backgroundColor: [
+                                '#00227F',
+                                '#4DA1FF',
+                                '#E50000',
+                                '#FFA500'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    </script>
+    
+    <!-- 用户预览入口浮窗按钮 -->
+    <button onclick="switchToUserView()" class="preview-entry-btn md:hidden" title="用户预览">
+        <i class="fa fa-eye text-xl"></i>
+    </button>
+
+    <!-- 用户预览模态框 -->
+    <div id="user-preview-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div class="flex items-center justify-between p-4 border-b">
+                <h3 class="text-lg font-bold text-gray-800">用户预览</h3>
+                <button onclick="closeUserPreview()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-4 overflow-y-auto max-h-[calc(90vh-60px)]">
+                <iframe id="user-preview-frame" class="w-full h-[600px] border-0"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 移动端菜单切换（使用全局变量）
+        
+        if (mobileMenuBtn && sidebar) {
+            mobileMenuBtn.addEventListener('click', function() {
+                sidebar.classList.toggle('active');
+                if (sidebarOverlay) {
+                    sidebarOverlay.classList.toggle('active');
+                }
+            });
+            
+            // 点击遮罩层关闭菜单
+            if (sidebarOverlay) {
+                sidebarOverlay.addEventListener('click', function() {
+                    sidebar.classList.remove('active');
+                    sidebarOverlay.classList.remove('active');
+                });
+            }
+            
+            // 点击侧边栏外部关闭菜单
+            document.addEventListener('click', function(e) {
+                if (!sidebar.contains(e.target) && !mobileMenuBtn.contains(e.target)) {
+                    sidebar.classList.remove('active');
+                    if (sidebarOverlay) {
+                        sidebarOverlay.classList.remove('active');
+                    }
+                }
+            });
+        }
+        
+        // 用户预览功能
+        function switchToUserView() {
+            const modal = document.getElementById('user-preview-modal');
+            const iframe = document.getElementById('user-preview-frame');
+            
+            // 创建用户视图内容
+            const userViewHTML = `
+                <!DOCTYPE html>
+                <html lang="zh-CN">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>用户视图 - 任务分发平台</title>
+                    <script src="https://cdn.tailwindcss.com"><\/script>
+                    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+                    <style>
+                        body { font-family: 'Inter', system-ui, sans-serif; background: #f5f5f5; }
+                        .task-card { background: white; border-radius: 8px; padding: 16px; margin-bottom: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                        .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+                    </style>
+                <\/head>
+                <body class="p-4">
+                    <div class="max-w-md mx-auto">
+                        <div class="bg-gradient-to-r from-[#00227F] to-[#4DA1FF] text-white p-4 rounded-t-lg">
+                            <h1 class="text-lg font-bold">我的任务</h1>
+                            <p class="text-sm opacity-90">中国东方航空</p>
+                        </div>
+                        
+                        <div class="bg-white p-4 rounded-b-lg shadow-sm mb-4">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <span class="text-2xl font-bold text-[#00227F]">8</span>
+                                    <span class="text-gray-600 text-sm ml-1">待处理</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-2xl font-bold text-green-600">24</span>
+                                    <span class="text-gray-600 text-sm ml-1">已完成</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <h2 class="text-sm font-bold text-gray-700 mb-2">待处理任务</h2>
+                        
+                        <div class="task-card">
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="font-medium text-gray-800">月度经营分析报表收集</h3>
+                                <span class="status-badge bg-red-100 text-red-800">今天截止</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-2">提交月度财务数据和分析报告</p>
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-gray-500">剩余 6 小时</span>
+                                <button class="bg-[#E50000] text-white px-4 py-1 rounded text-sm">立即处理</button>
+                            </div>
+                        </div>
+                        
+                        <div class="task-card">
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="font-medium text-gray-800">部门培训计划提交</h3>
+                                <span class="status-badge bg-yellow-100 text-yellow-800">明天截止</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-2">提交下季度部门培训计划</p>
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-gray-500">剩余 18 小时</span>
+                                <button class="bg-[#00227F] text-white px-4 py-1 rounded text-sm">立即处理</button>
+                            </div>
+                        </div>
+                        
+                        <div class="task-card">
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="font-medium text-gray-800">安全检查记录表</h3>
+                                <span class="status-badge bg-yellow-100 text-yellow-800">2天后截止</span>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-2">提交本月安全检查记录</p>
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-gray-500">剩余 2 天</span>
+                                <button class="bg-[#00227F] text-white px-4 py-1 rounded text-sm">立即处理</button>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4 text-center">
+                            <p class="text-xs text-gray-500">中国东方航空 © 2024</p>
+                        </div>
+                    </div>
+                <\/body>
+                <\/html>
+            `;
+            
+            iframe.srcdoc = userViewHTML;
+            modal.classList.remove('hidden');
+        }
+        
+        function closeUserPreview() {
+            const modal = document.getElementById('user-preview-modal');
+            modal.classList.add('hidden');
+        }
+        
+        // 点击模态框外部关闭
+        document.getElementById('user-preview-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeUserPreview();
+            }
+        });
+    </script>
+</body>
+</html>
